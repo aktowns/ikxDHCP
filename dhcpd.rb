@@ -24,15 +24,21 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+
 require_relative 'shared'
 raise "Please provide an interface to use via the command line (#{__FILE__} en1)" if ARGV[0].nil?
 @eth = ARGV[0]
 @mac = get_macaddr()[@eth]
 
-ip_pool = "192.168.10.#{1..254}"
+@ip_pool = lambda{pool = {}; (10..254).each{|x| pool["192.168.1.#{x}"] = false }; pool}.call
+
+def first_free_ip
+  @ip_pool.each {|x,y| return x if y == false}
+  raise "IP Pool has been exhausted.."
+end
 
 def send_offer packet, options
-  send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]), :ethsrc => @mac, 
+  send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :ethsrc => @mac, :yiaddr => first_free_ip,# To give them what they want => :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]),
   :saddr => '192.168.1.3', :sport => 67, :dport => 68, :dhcpoptions => build_options_pack(
     [:DHCPMessageType, :len, :DHCPMessageTypeOffer],
     [:DHCPServerIdentifier, :len, to_primative_ip('192.168.1.3')],
@@ -45,7 +51,15 @@ def send_offer packet, options
   )
 end
 def send_ack packet, options
-  send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]), :ethsrc => @mac, 
+  if (@ip_pool[hex2ipstr(options[:DHCPRequestedIPAddress])] == false)
+    puts "Giving out #{hex2ipstr(options[:DHCPRequestedIPAddress])}"
+    ip = hex2ipstr(options[:DHCPRequestedIPAddress])
+    @ip_pool[hex2ipstr(options[:DHCPRequestedIPAddress])] = true
+  else
+    puts "Giving out #{first_free_ip}"
+    ip = first_free_ip
+  end
+  send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :ethsrc => @mac, :yiaddr => ip,  # To give them what they want => :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]),
   :saddr => '192.168.1.3', :sport => 67, :dport => 68, :dhcpoptions => build_options_pack(
     [:DHCPMessageType, :len, :DHCPMessageTypeAck],
     [:DHCPServerIdentifier, :len, to_primative_ip('192.168.1.3')],
@@ -56,6 +70,7 @@ def send_ack packet, options
     [:DHCPHostName, :len, str2hex("ikebookpro")],
     [DHCPOptionsEnd]
   )
+  
 end
 
 def handle_packet packet
@@ -75,7 +90,7 @@ def handle_packet packet
         return
       end
       puts "* TODO: writelease file"
-      puts "[#{packet.xid}] Sending a DHCPAck to #{options[:DHCPHostName].join} for #{hex2ip(options[:DHCPRequestedIPAddress].join)}"
+      puts "[#{packet.xid}] Sending a DHCPAck to #{options[:DHCPHostName].join} for #{first_free_ip}"
       send_ack packet, options
     else
       puts "I don't know of a #{options[:DHCPMessageType]}"
