@@ -30,6 +30,10 @@ raise "Please provide an interface to use via the command line (#{__FILE__} en1)
 @eth = ARGV[0]
 @mac = get_macaddr()[@eth]
 
+# BUG: Not handling double 00 in xid properly.
+
+PORT = 67
+
 @ip_pool = lambda{pool = {}; (10..254).each{|x| pool["192.168.1.#{x}"] = false }; pool}.call
 
 def first_free_ip
@@ -39,7 +43,7 @@ end
 
 def send_offer packet, options
   send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :ethsrc => @mac, :yiaddr => first_free_ip,# To give them what they want => :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]),
-  :saddr => '192.168.1.3', :sport => 67, :dport => 68, :dhcpoptions => build_options_pack(
+  :saddr => '192.168.1.3', :sport => PORT, :dport => PORT+1, :dhcpoptions => build_options_pack(
     [:DHCPMessageType, :len, :DHCPMessageTypeOffer],
     [:DHCPServerIdentifier, :len, to_primative_ip('192.168.1.3')],
     [:DHCPIPAddressLeaseTime, :len, 0x00, 0x01, 0x51, 0x80], # 1 Day
@@ -61,7 +65,7 @@ def send_ack packet, options
     @ip_pool[ip] = true
   end
   send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :ethsrc => @mac, :yiaddr => ip,  # To give them what they want => :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]),
-  :saddr => '192.168.1.3', :sport => 67, :dport => 68, :dhcpoptions => build_options_pack(
+  :saddr => '192.168.1.3', :sport => PORT, :dport => PORT+1, :dhcpoptions => build_options_pack(
     [:DHCPMessageType, :len, :DHCPMessageTypeAck],
     [:DHCPServerIdentifier, :len, to_primative_ip('192.168.1.3')],
     [:DHCPIPAddressLeaseTime, :len, 0x00, 0x01, 0x51, 0x80], # 1 Day
@@ -102,7 +106,7 @@ BasicSocket.do_not_reverse_lookup = true
 s = UDPSocket.new
 s.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
 s.setsockopt(Socket::SOL_SOCKET, Socket::SO_BROADCAST, 1)
-s.bind("", 67)
+s.bind("", PORT)
 
 puts "DHCPd active.."
 loop do
