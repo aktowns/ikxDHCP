@@ -54,10 +54,11 @@ def send_ack packet, options
   if (@ip_pool[hex2ipstr(options[:DHCPRequestedIPAddress])] == false)
     puts "Giving out #{hex2ipstr(options[:DHCPRequestedIPAddress])}"
     ip = hex2ipstr(options[:DHCPRequestedIPAddress])
-    @ip_pool[hex2ipstr(options[:DHCPRequestedIPAddress])] = true
+    @ip_pool[ip] = true
   else
     puts "Giving out #{first_free_ip}"
     ip = first_free_ip
+    @ip_pool[ip] = true
   end
   send_packet :op => 2, :xid => packet.xid,:chaddr => packet.chaddr, :ethsrc => @mac, :yiaddr => ip,  # To give them what they want => :yiaddr => hex2ipstr(options[:DHCPRequestedIPAddress]),
   :saddr => '192.168.1.3', :sport => 67, :dport => 68, :dhcpoptions => build_options_pack(
