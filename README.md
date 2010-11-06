@@ -16,7 +16,10 @@ To use you need:
 
 To install you need ruby 1.9.x  
 then launch with 
-    './dhcp[dc].rb <eth adapter>'  
+    ./dhcp[dc].rb <eth adapter>
+
+You may need to prefix the above with  
+    sudo -E 
 
 Released under the MIT license. 
 
